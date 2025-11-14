@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import logo from './logo.svg';
 import './App.css';
+import TopHeadlinesView from './views/TopHeadlinesView';
+import SearchView from './views/SearchView';
 
 // PUBLIC_INTERFACE
 function App() {
+  /** Root application component with theme toggle and news tabs. */
   const [theme, setTheme] = useState('light');
+  const [tab, setTab] = useState('headlines'); // 'headlines' | 'search'
 
-  // Effect to apply theme to document element
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
@@ -18,30 +20,39 @@ function App() {
 
   return (
     <div className="App">
-      <header className="App-header">
-        <button 
-          className="theme-toggle" 
-          onClick={toggleTheme}
-          aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+      <nav className="navbar">
+        <div style={{ fontWeight: 800, color: 'var(--text-secondary)', marginRight: 12 }}>
+          Ocean News
+        </div>
+        <button
+          className={`tab ${tab === 'headlines' ? 'active' : ''}`}
+          onClick={() => setTab('headlines')}
         >
-          {theme === 'light' ? '🌙 Dark' : '☀️ Light'}
+          Top Headlines
         </button>
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <p>
-          Current theme: <strong>{theme}</strong>
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          className={`tab ${tab === 'search' ? 'active' : ''}`}
+          onClick={() => setTab('search')}
         >
-          Learn React
-        </a>
-      </header>
+          Search
+        </button>
+        <div style={{ marginLeft: 'auto' }}>
+          <button
+            className="btn"
+            onClick={toggleTheme}
+            aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+          >
+            {theme === 'light' ? '🌙 Dark' : '☀️ Light'}
+          </button>
+        </div>
+      </nav>
+
+      <main className="container">
+        {tab === 'headlines' ? <TopHeadlinesView /> : <SearchView />}
+        <footer style={{ marginTop: 24, fontSize: 12, color: '#6b7280' }}>
+          Powered by NewsAPI.org
+        </footer>
+      </main>
     </div>
   );
 }
