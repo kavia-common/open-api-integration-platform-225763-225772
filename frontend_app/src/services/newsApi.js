@@ -1,10 +1,11 @@
 //
+//
 // NewsAPI client for fetching top headlines and search results.
 // Reads configuration from environment variables and supports proxy usage.
 //
 // Security: No secrets are hardcoded. The API key must be supplied via REACT_APP_NEWS_API_KEY
-// when calling NewsAPI directly from the browser. When using a backend proxy, the API key should
-// remain on the server and should NOT be sent from the browser.
+// only when calling NewsAPI directly from the browser. When using a backend proxy, the API key
+// must remain on the server and should NOT be sent from the browser.
 //
 // This module adds robust error handling for network/CORS problems and clearer diagnostics.
 // It supports two modes:
@@ -18,21 +19,30 @@ function stripTrailingSlashes(s) {
 }
 
 function isProxyBase(base) {
-  // A simple heuristic: if the base includes newsapi.org, we treat it as direct mode
-  // Otherwise, we assume it's a proxy base (e.g., http://localhost:3010/api/news)
+  // Heuristic: if the base includes newsapi.org, treat as direct mode; else proxy mode.
   return !/newsapi\.org/i.test(base || '');
 }
 
 // PUBLIC_INTERFACE
 export function getNewsApiConfig() {
-  /** Get NewsAPI configuration from environment variables with safe defaults. */
-  const baseRaw = process.env.REACT_APP_NEWS_API_BASE || DEFAULT_BASE;
+  /** Get NewsAPI configuration from environment variables with safe defaults.
+   *
+   * PUBLIC ENV VARS (CRA exposes only REACT_APP_*):
+   * - REACT_APP_NEWS_API_BASE: Preferred base URL (proxy like http://localhost:3010/api/news or direct https://newsapi.org/v2)
+   * - REACT_APP_NEWS_API_KEY:  Only required in direct mode; do not set/use in proxy mode.
+   *
+   * Deprecated/misnamed variables (ignored): REACT_APP_NEWS_APP_BASE, REACT_APP_API_BASE, REACT_APP_REACT_APP_NEWSAPI_KEY, REACT_APP_REACT_APP_NEWS_API_BASE
+   */
+  // Standardize: prefer REACT_APP_NEWS_API_BASE. Fallback to legacy names only if strictly necessary.
+  const legacyBase =
+    process.env.REACT_APP_REACT_APP_NEWS_API_BASE ||
+    process.env.REACT_APP_API_BASE ||
+    process.env.REACT_APP_NEWS_APP_BASE;
+  const baseRaw = process.env.REACT_APP_NEWS_API_BASE || legacyBase || DEFAULT_BASE;
   const base = stripTrailingSlashes(baseRaw);
 
   // Note: CRA only exposes REACT_APP_* vars to the browser
-  const apiKey =
-    process.env.REACT_APP_NEWS_API_KEY ||
-    process.env.REACT_APP_REACT_APP_NEWSAPI_KEY; // tolerant fallback for misnamed env var
+  const apiKey = process.env.REACT_APP_NEWS_API_KEY || undefined; // do NOT read misnamed duplicates
 
   return { base, apiKey };
 }
@@ -80,14 +90,14 @@ function isNetworkOrCORSError(err) {
 /**
  * Generate a concise, user-friendly error suitable for UI display without leaking secrets.
  */
-function toUserFacingError(err, url) {
+function toUserFacingError(err, url, mode) {
   if (isNetworkOrCORSError(err)) {
     // Provide guidance on common causes
     const e = new Error(
-      'Network/CORS error: Unable to reach the news service. If you are using a proxy, ensure REACT_APP_NEWS_APP_BASE is set correctly and that the proxy is running.'
+      `Network/CORS error: Unable to reach the news service (${mode}). If using a proxy, ensure REACT_APP_NEWS_API_BASE points to it and that the proxy is running. Otherwise verify CORS/network access and try again.`
     );
     e.code = 'NETWORK';
-    e.details = { url };
+    e.details = { url, mode };
     return e;
   }
   return err instanceof Error ? err : new Error('Unexpected error occurred.');
@@ -102,6 +112,7 @@ function toUserFacingError(err, url) {
 async function doFetch(endpoint, params, externalSignal) {
   const { base, apiKey } = getNewsApiConfig();
   const proxy = isProxyBase(base);
+  const mode = proxy ? 'proxy' : 'direct';
 
   if (!/^https?:\/\//i.test(base)) {
     const e = new Error('Invalid NewsAPI base URL. Ensure REACT_APP_NEWS_API_BASE starts with http(s)://');
@@ -149,7 +160,7 @@ async function doFetch(endpoint, params, externalSignal) {
     });
   } catch (err) {
     clearTimeout(timeout);
-    throw toUserFacingError(err, url);
+    throw toUserFacingError(err, url, mode);
   }
   clearTimeout(timeout);
 
