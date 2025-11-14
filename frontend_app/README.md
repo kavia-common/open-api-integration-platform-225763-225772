@@ -14,12 +14,23 @@ This project provides a minimal React template with a clean, modern UI and minim
 Before running the app, configure environment variables:
 
 1. Copy `.env.example` to `.env` in `frontend_app/` and set:
-   - REACT_APP_NEWS_API_KEY (required): your key from https://newsapi.org/
-   - REACT_APP_NEWS_API_BASE (optional): defaults to `https://newsapi.org/v2`; set to your backend proxy URL if you must avoid CORS in the browser.
+
+   - REACT_APP_NEWS_API_BASE (recommended): the URL of your backend proxy that forwards to NewsAPI.  
+     Example: `http://localhost:3010/api/news`  
+     The frontend will call the proxy at:
+       - `/top-headlines` for top headlines
+       - `/search` for searching (the proxy maps this to NewsAPI's `/everything`)
+
+   - REACT_APP_NEWS_API_KEY (optional in proxy mode; required only for direct NewsAPI calls):  
+     Your key from https://newsapi.org/ if you plan to call NewsAPI directly from the browser (not recommended due to CORS).  
+     When using the proxy, keep your key on the server and do NOT expose it to the browser.
+
+Defaults:
+- If REACT_APP_NEWS_API_BASE is not set, the app falls back to `https://newsapi.org/v2` (direct mode) and uses `/top-headlines` and `/everything`.
 
 Common issues:
-- If you see "Network/CORS error", your browser may be blocking cross-origin requests. Consider proxying NewsAPI through a backend and set REACT_APP_NEWS_API_BASE to the proxy URL.
-- If you see "Unauthorized" or config-related errors, ensure REACT_APP_NEWS_API_KEY is present and correct.
+- If you see "Network/CORS error", your browser may be blocking cross-origin requests. Prefer using the backend proxy and set `REACT_APP_NEWS_API_BASE` to the proxy URL (e.g., `http://localhost:3010/api/news`). Ensure the proxy service is running and reachable.
+- If you see "Unauthorized" or config-related errors in direct mode, ensure `REACT_APP_NEWS_API_KEY` is present and correct.
 
 ## Getting Started
 

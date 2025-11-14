@@ -1,22 +1,38 @@
 //
 // NewsAPI client for fetching top headlines and search results.
-// Reads configuration from environment variables.
+// Reads configuration from environment variables and supports proxy usage.
 //
-// Security: No secrets are hardcoded. The API key must be supplied via REACT_APP_NEWS_API_KEY.
+// Security: No secrets are hardcoded. The API key must be supplied via REACT_APP_NEWS_API_KEY
+// when calling NewsAPI directly from the browser. When using a backend proxy, the API key should
+// remain on the server and should NOT be sent from the browser.
+//
 // This module adds robust error handling for network/CORS problems and clearer diagnostics.
+// It supports two modes:
+//  - Direct mode (base includes newsapi.org): endpoints 'top-headlines' and 'everything' with X-Api-Key header
+//  - Proxy mode (custom base, e.g., http://localhost:3010/api/news): endpoints 'top-headlines' and 'search' with NO API key header
 //
 const DEFAULT_BASE = 'https://newsapi.org/v2';
+
+function stripTrailingSlashes(s) {
+  return String(s || '').replace(/\/*$/, '');
+}
+
+function isProxyBase(base) {
+  // A simple heuristic: if the base includes newsapi.org, we treat it as direct mode
+  // Otherwise, we assume it's a proxy base (e.g., http://localhost:3010/api/news)
+  return !/newsapi\.org/i.test(base || '');
+}
 
 // PUBLIC_INTERFACE
 export function getNewsApiConfig() {
   /** Get NewsAPI configuration from environment variables with safe defaults. */
   const baseRaw = process.env.REACT_APP_NEWS_API_BASE || DEFAULT_BASE;
-  const base = String(baseRaw).replace(/\/*$/, '');
+  const base = stripTrailingSlashes(baseRaw);
 
   // Note: CRA only exposes REACT_APP_* vars to the browser
   const apiKey =
     process.env.REACT_APP_NEWS_API_KEY ||
-    process.env.REACT_APP_REACT_APP_NEWSAPI_KEY; // tolerant fallback
+    process.env.REACT_APP_REACT_APP_NEWSAPI_KEY; // tolerant fallback for misnamed env var
 
   return { base, apiKey };
 }
@@ -40,7 +56,7 @@ function mapApiError(status, payload) {
     return 'News service is currently unavailable. Please try again later.';
   }
   if (status === 401 || status === 403) {
-    return 'Unauthorized: Please ensure a valid NewsAPI key is configured.';
+    return 'Unauthorized: Please ensure a valid NewsAPI key is configured (direct mode) or proxy is authorized.';
   }
   return message;
 }
@@ -68,7 +84,7 @@ function toUserFacingError(err, url) {
   if (isNetworkOrCORSError(err)) {
     // Provide guidance on common causes
     const e = new Error(
-      'Network/CORS error: Unable to reach the news service. This can occur if your browser blocked the request or the service is unavailable.'
+      'Network/CORS error: Unable to reach the news service. If you are using a proxy, ensure REACT_APP_NEWS_APP_BASE is set correctly and that the proxy is running.'
     );
     e.code = 'NETWORK';
     e.details = { url };
@@ -77,14 +93,15 @@ function toUserFacingError(err, url) {
   return err instanceof Error ? err : new Error('Unexpected error occurred.');
 }
 
+/**
+ * Internal fetch with mode-aware endpoint resolution and headers.
+ * Supported logical endpoints:
+ *  - 'top-headlines'
+ *  - 'search' (maps to 'search' in proxy mode, 'everything' in direct mode)
+ */
 async function doFetch(endpoint, params, externalSignal) {
   const { base, apiKey } = getNewsApiConfig();
-
-  if (!apiKey) {
-    const e = new Error('NewsAPI key is missing. Set REACT_APP_NEWS_API_KEY in your environment.');
-    e.code = 'CONFIG';
-    throw e;
-  }
+  const proxy = isProxyBase(base);
 
   if (!/^https?:\/\//i.test(base)) {
     const e = new Error('Invalid NewsAPI base URL. Ensure REACT_APP_NEWS_API_BASE starts with http(s)://');
@@ -92,8 +109,21 @@ async function doFetch(endpoint, params, externalSignal) {
     throw e;
   }
 
+  // In direct mode, API key is required; in proxy mode, do not require or send key.
+  if (!proxy && !apiKey) {
+    const e = new Error('NewsAPI key is missing. Set REACT_APP_NEWS_API_KEY in your environment or use the proxy.');
+    e.code = 'CONFIG';
+    throw e;
+  }
+
+  // Resolve actual path based on mode
+  const path =
+    endpoint === 'search'
+      ? (proxy ? 'search' : 'everything')
+      : endpoint; // 'top-headlines' passes through
+
   const query = buildQuery(params);
-  const url = `${base}/${endpoint}${query ? `?${query}` : ''}`;
+  const url = `${base}/${path}${query ? `?${query}` : ''}`;
 
   // Merge signals and provide a default timeout to prevent hanging requests
   const controller = new AbortController();
@@ -110,9 +140,11 @@ async function doFetch(endpoint, params, externalSignal) {
   try {
     res = await fetch(url, {
       method: 'GET',
-      headers: {
-        'X-Api-Key': apiKey,
-      },
+      headers: proxy
+        ? {} // No key sent in proxy mode
+        : {
+            'X-Api-Key': apiKey,
+          },
       signal: controller.signal,
     });
   } catch (err) {
@@ -160,8 +192,8 @@ export async function getTopHeadlines(
   if (category) params.category = category;
   const data = await doFetch('top-headlines', params, signal);
   return {
-    totalResults: data.totalResults || 0,
-    articles: Array.isArray(data.articles) ? data.articles : [],
+    totalResults: data?.totalResults || 0,
+    articles: Array.isArray(data?.articles) ? data.articles : [],
   };
 }
 
@@ -175,6 +207,8 @@ export async function searchEverything(
    * - q: search query string (required)
    * - sortBy: relevancy, popularity, publishedAt
    * - language: e.g., 'en', 'de', 'fr'
+   *
+   * In proxy mode, this calls '/search'; in direct mode, this calls '/everything'.
    */
   const query = String(q || '').trim();
   if (!query) {
@@ -195,9 +229,9 @@ export async function searchEverything(
     pageSize: safePageSize,
     page: safePage,
   };
-  const data = await doFetch('everything', params, signal);
+  const data = await doFetch('search', params, signal); // logical 'search' maps by mode
   return {
-    totalResults: data.totalResults || 0,
-    articles: Array.isArray(data.articles) ? data.articles : [],
+    totalResults: data?.totalResults || 0,
+    articles: Array.isArray(data?.articles) ? data.articles : [],
   };
 }

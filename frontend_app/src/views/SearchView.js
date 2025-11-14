@@ -25,9 +25,9 @@ export default function SearchView() {
       const msg = e?.message || 'Failed to search news.';
       const enriched =
         e?.code === 'NETWORK'
-          ? `${msg} If this persists, verify CORS/network access and try again.`
+          ? `${msg} If you're using a proxy, ensure REACT_APP_NEWS_API_BASE points to it and that the proxy is running. Otherwise verify CORS/network access and try again.`
           : e?.code === 'CONFIG'
-          ? `${msg} Please configure REACT_APP_NEWS_API_KEY (and optional REACT_APP_NEWS_API_BASE).`
+          ? `${msg} For direct NewsAPI usage, set REACT_APP_NEWS_API_KEY. To avoid CORS, set REACT_APP_NEWS_API_BASE to your proxy (e.g., http://localhost:3010/api/news).`
           : msg;
       setError(enriched);
     } finally {
