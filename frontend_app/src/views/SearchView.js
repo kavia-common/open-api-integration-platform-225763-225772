@@ -22,7 +22,14 @@ export default function SearchView() {
       }
     } catch (e) {
       setArticles([]);
-      setError(e?.message || 'Failed to search news.');
+      const msg = e?.message || 'Failed to search news.';
+      const enriched =
+        e?.code === 'NETWORK'
+          ? `${msg} If this persists, verify CORS/network access and try again.`
+          : e?.code === 'CONFIG'
+          ? `${msg} Please configure REACT_APP_NEWS_API_KEY (and optional REACT_APP_NEWS_API_BASE).`
+          : msg;
+      setError(enriched);
     } finally {
       setLoading(false);
     }

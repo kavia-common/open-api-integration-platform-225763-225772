@@ -26,7 +26,15 @@ export default function TopHeadlinesView() {
         setArticles(res.articles);
       })
       .catch((e) => {
-        setError(e?.message || 'Failed to load top headlines.');
+        const msg = e?.message || 'Failed to load top headlines.';
+        // Provide helpful hints for common cases without leaking sensitive data
+        const enriched =
+          e?.code === 'NETWORK'
+            ? `${msg} If this persists, verify CORS/network access and try again.`
+            : e?.code === 'CONFIG'
+            ? `${msg} Please configure REACT_APP_NEWS_API_KEY (and optional REACT_APP_NEWS_API_BASE).`
+            : msg;
+        setError(enriched);
         setArticles([]);
       })
       .finally(() => setLoading(false));

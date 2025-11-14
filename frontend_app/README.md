@@ -4,10 +4,22 @@ This project provides a minimal React template with a clean, modern UI and minim
 
 ## Features
 
-- **Lightweight**: No heavy UI frameworks - uses only vanilla CSS and React
-- **Modern UI**: Clean, responsive design with KAVIA brand styling
-- **Fast**: Minimal dependencies for quick loading times
-- **Simple**: Easy to understand and modify
+- Lightweight: No heavy UI frameworks - uses only vanilla CSS and React
+- Modern UI: Clean, responsive design with KAVIA brand styling
+- Fast: Minimal dependencies for quick loading times
+- Simple: Easy to understand and modify
+
+## Configuration (NewsAPI)
+
+Before running the app, configure environment variables:
+
+1. Copy `.env.example` to `.env` in `frontend_app/` and set:
+   - REACT_APP_NEWS_API_KEY (required): your key from https://newsapi.org/
+   - REACT_APP_NEWS_API_BASE (optional): defaults to `https://newsapi.org/v2`; set to your backend proxy URL if you must avoid CORS in the browser.
+
+Common issues:
+- If you see "Network/CORS error", your browser may be blocking cross-origin requests. Consider proxying NewsAPI through a backend and set REACT_APP_NEWS_API_BASE to the proxy URL.
+- If you see "Unauthorized" or config-related errors, ensure REACT_APP_NEWS_API_KEY is present and correct.
 
 ## Getting Started
 
